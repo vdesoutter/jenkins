@@ -32,8 +32,7 @@ class Chef
     attribute :description,
               kind_of: String              
     attribute :filename,
-              kind_of: String,
-              name_attribute: true
+              kind_of: String
     attribute :data,
               kind_of: String,
               required: true
@@ -102,29 +101,6 @@ class Chef
           null,
           null
         )
-      EOH
-    end
-
-    #
-    # @see Chef::Resource::JenkinsCredentials#fetch_credentials_groovy
-    #
-    def fetch_existing_credentials_groovy(groovy_variable_name)
-      <<-EOH.gsub(/ ^{8}/, '')
-        import jenkins.model.Jenkins;
-        import hudson.util.Secret;
-        import com.cloudbees.plugins.credentials.common.IdCredentials
-        import com.cloudbees.plugins.credentials.CredentialsProvider
-
-        available_credentials =
-          CredentialsProvider.lookupCredentials(
-            IdCredentials.class,
-            Jenkins.getInstance(),
-            hudson.security.ACL.SYSTEM
-          ).findAll({
-            it.id == #{convert_to_groovy('credentials.id')}
-          })
-
-        #{groovy_variable_name} = available_credentials.size() > 0 ? available_credentials[0] : null
       EOH
     end
 

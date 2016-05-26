@@ -31,8 +31,7 @@ class Chef
 
     # Attributes
     attribute :description,
-              kind_of: String,
-              name_attribute: true
+              kind_of: String
     attribute :secret,
               kind_of: String,
               required: true
@@ -73,15 +72,6 @@ class Chef
           #{convert_to_groovy(new_resource.description)},
           new Secret(#{convert_to_groovy(new_resource.secret)}),
         )
-      EOH
-    end
-
-    #
-    # @see Chef::Resource::JenkinsCredentials#fetch_credentials_groovy
-    #
-    def fetch_existing_credentials_groovy(groovy_variable_name)
-      <<-EOH.gsub(/ ^{8}/, '')
-        #{credentials_for_secret_groovy(new_resource.secret, new_resource.description, groovy_variable_name)}
       EOH
     end
 

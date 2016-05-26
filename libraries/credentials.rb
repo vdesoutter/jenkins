@@ -42,7 +42,7 @@ class Chef
     # Attributes
     attribute :id,
               kind_of: String,
-              default: lazy { SecureRandom.uuid }
+              name_attribute: true
 
     attr_writer :exists
 
@@ -173,7 +173,23 @@ class Chef
     # @return [String]
     #
     def fetch_existing_credentials_groovy(_groovy_variable_name)
-      raise NotImplementedError, 'You must implement #fetch_existing_credentials_groovy.'
+      <<-EOH.gsub(/ ^{8}/, '')
+        import jenkins.model.Jenkins;
+        import hudson.util.Secret;
+        import com.cloudbees.plugins.credentials.common.IdCredentials
+        import com.cloudbees.plugins.credentials.CredentialsProvider
+
+        available_credentials =
+          CredentialsProvider.lookupCredentials(
+            IdCredentials.class,
+            Jenkins.getInstance(),
+            hudson.security.ACL.SYSTEM
+          ).findAll({
+            it.id == #{convert_to_groovy('credentials.id')}
+          })
+
+        #{_groovy_variable_name} = available_credentials.size() > 0 ? available_credentials[0] : null
+      EOH
     end
 
     #

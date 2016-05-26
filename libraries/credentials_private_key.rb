@@ -29,13 +29,12 @@ class Chef
     resource_name :jenkins_private_key_credentials
 
     # Attributes
-    attribute :username,
-              kind_of: String,
-              name_attribute: true
     attribute :id,
               kind_of: String,
               regex: UUID_REGEX, # Private Key credentials must still have a UUID based ID
-              default: lazy { SecureRandom.uuid }
+              name_attribute: true
+    attribute :username,
+              kind_of: String
     attribute :private_key,
               kind_of: [String, OpenSSL::PKey::RSA],
               required: true

@@ -46,15 +46,6 @@ class Chef
     protected
 
     #
-    # @see Chef::Resource::JenkinsCredentials#save_credentials_groovy
-    #
-    def fetch_existing_credentials_groovy(groovy_variable_name)
-      <<-EOH.gsub(/ ^{8}/, '')
-        #{credentials_for_username_groovy(new_resource.username, groovy_variable_name)}
-      EOH
-    end
-
-    #
     # @see Chef::Resource::JenkinsCredentials#resource_attributes_groovy
     #
     def resource_attributes_groovy(groovy_variable_name)
