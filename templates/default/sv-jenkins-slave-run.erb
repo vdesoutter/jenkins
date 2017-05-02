@@ -7,7 +7,7 @@
 
 exec 2>&1
 cd <%= @options[:new_resource].remote_fs %>
-exec chpst -o 32768 -u <%= @options[:new_resource].user %> \
+exec chpst -u <%= @options[:new_resource].user %> \
   env HOME=<%= @options[:new_resource].remote_fs %> \
   JENKINS_HOME=<%= @options[:new_resource].remote_fs %> \
   <%= @options[:java_bin] %> \
