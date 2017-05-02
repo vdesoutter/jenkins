@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # HWRP:: credentials_password
 #
-# Author:: Seth Chisamore <schisamo@getchef.com>
+# Author:: Seth Chisamore <schisamo@chef.io>
 #
 # Copyright 2013-2014, Chef Software, Inc.
 #
@@ -18,19 +18,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 require_relative 'credentials'
+require_relative 'credentials_user'
+require_relative '_params_validate'
 
 class Chef
-  class Resource::JenkinsPrivateKeyCredentials < Resource::JenkinsCredentials
-    provides :jenkins_private_key_credentials
+  class Resource::JenkinsPrivateKeyCredentials < Resource::JenkinsUserCredentials
+    include Jenkins::Helper
 
-    def initialize(name, run_context = nil)
-      super
+    resource_name :jenkins_private_key_credentials
 
-      @resource_name = :jenkins_private_key_credentials
-      @provider = Provider::JenkinsPrivateKeyCredentials
-    end
+    # Attributes
+    attribute :id,
+              kind_of: String,
+              regex: UUID_REGEX, # Private Key credentials must still have a UUID based ID
+              name_attribute: true
+    attribute :username,
+              kind_of: String
+    attribute :private_key,
+              kind_of: [String, OpenSSL::PKey::RSA],
+              required: true
+    attribute :passphrase,
+              kind_of: String
 
     #
     # Private key of the credentials . This should be the actual key
@@ -40,29 +49,20 @@ class Chef
     # @param [String] arg
     # @return [String]
     #
-    def private_key(arg = nil)
-      if arg.nil?
-        @private_key
+    def rsa_private_key
+      if private_key.is_a?(OpenSSL::PKey::RSA)
+        private_key.to_pem
       else
-        arg = OpenSSL::PKey::RSA.new(arg).to_pem unless arg.empty?
-        set_or_return(:private_key, arg, kind_of: String)
+        OpenSSL::PKey::RSA.new(private_key).to_pem
       end
-    end
-
-    #
-    # Passphrase for the private key of the credentials.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def passphrase(arg = nil)
-      set_or_return(:passphrase, arg, kind_of: String)
     end
   end
 end
 
 class Chef
-  class Provider::JenkinsPrivateKeyCredentials < Provider::JenkinsCredentials
+  class Provider::JenkinsPrivateKeyCredentials < Provider::JenkinsUserCredentials
+    provides :jenkins_private_key_credentials
+
     def load_current_resource
       @current_resource ||= Resource::JenkinsPrivateKeyCredentials.new(new_resource.name)
 
@@ -71,6 +71,8 @@ class Chef
       if current_credentials
         @current_resource.private_key(current_credentials[:private_key])
       end
+
+      @current_resource
     end
 
     protected
@@ -84,7 +86,7 @@ class Chef
         import com.cloudbees.plugins.credentials.*
         import com.cloudbees.jenkins.plugins.sshcredentials.impl.*
 
-        private_key = """#{new_resource.private_key}
+        private_key = """#{new_resource.rsa_private_key}
         """
 
         credentials = new BasicSSHUserPrivateKey(
@@ -104,7 +106,7 @@ class Chef
     def attribute_to_property_map
       {
         private_key: 'credentials.privateKey',
-        passphrase: 'credentials.passphrase.plainText',
+        passphrase: 'credentials.passphrase.plainText'
       }
     end
 

@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # HWRP:: credentials_password
 #
-# Author:: Seth Chisamore <schisamo@getchef.com>
+# Author:: Seth Chisamore <schisamo@chef.io>
 #
 # Copyright 2013-2014, Chef Software, Inc.
 #
@@ -20,40 +20,35 @@
 #
 
 require_relative 'credentials'
+require_relative 'credentials_user'
+require_relative '_params_validate'
 
 class Chef
-  class Resource::JenkinsPasswordCredentials < Resource::JenkinsCredentials
-    provides :jenkins_password_credentials
+  class Resource::JenkinsPasswordCredentials < Resource::JenkinsUserCredentials
+    resource_name :jenkins_password_credentials
 
-    def initialize(name, run_context = nil)
-      super
-
-      @resource_name = :jenkins_password_credentials
-      @provider = Provider::JenkinsPasswordCredentials
-    end
-
-    #
-    # The password of the credentials.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def password(arg = nil)
-      set_or_return(:password, arg, kind_of: String)
-    end
+    # Attributes
+    attribute :username,
+              kind_of: String
+    attribute :password,
+              kind_of: String
   end
 end
 
 class Chef
-  class Provider::JenkinsPasswordCredentials < Provider::JenkinsCredentials
+  class Provider::JenkinsPasswordCredentials < Provider::JenkinsUserCredentials
+    provides :jenkins_password_credentials
+
     def load_current_resource
       @current_resource ||= Resource::JenkinsPasswordCredentials.new(new_resource.name)
+
+      super
 
       if current_credentials
         @current_resource.password(current_credentials[:password])
       end
 
-      super
+      @current_credentials
     end
 
     protected
@@ -81,9 +76,7 @@ class Chef
     # @see Chef::Resource::JenkinsCredentials#attribute_to_property_map
     #
     def attribute_to_property_map
-      {
-        password: 'credentials.password.plainText',
-      }
+      { password: 'credentials.password.plainText' }
     end
   end
 end

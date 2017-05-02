@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # HWRP:: slave
 #
-# Author:: Seth Chisamore <schisamo@getchef.com>
+# Author:: Seth Chisamore <schisamo@chef.io>
 #
 # Copyright 2013-2014, Chef Software, Inc.
 #
@@ -19,222 +19,67 @@
 # limitations under the License.
 #
 
-require 'chef/resource'
-require 'chef/provider'
 require 'json'
 
+require_relative '_helper'
+require_relative '_params_validate'
+
 class Chef
-  class Resource::JenkinsSlave < Resource
+  class Resource::JenkinsSlave < Resource::LWRPBase
+    resource_name :jenkins_slave
+
+    # Chef attributes
     identity_attr :slave_name
+
+    # Actions
+    actions :create, :delete, :connect, :disconnect, :online, :offline
+    default_action :create
+
+    # Attributes
+    attribute :slave_name,
+              kind_of: String,
+              name_attribute: true
+    attribute :description,
+              kind_of: String,
+              default: lazy { |new_resource| "Jenkins slave #{new_resource.slave_name}" }
+    attribute :remote_fs,
+              kind_of: String,
+              default: '/home/jenkins'
+    attribute :executors,
+              kind_of: Integer,
+              default: 1
+    attribute :usage_mode,
+              kind_of: String,
+              equal_to: %w(exclusive normal),
+              default: 'normal'
+    attribute :labels,
+              kind_of: Array,
+              default: []
+    attribute :availability,
+              kind_of: String,
+              equal_to: %w(always demand)
+    attribute :in_demand_delay,
+              kind_of: Integer,
+              default: 0
+    attribute :idle_delay,
+              kind_of: Integer,
+              default: 1
+    attribute :environment,
+              kind_of: Hash
+    attribute :offline_reason,
+              kind_of: String
+    attribute :user,
+              kind_of: String,
+              regex: Config[:user_valid_regex],
+              default: 'jenkins'
+    attribute :jvm_options,
+              kind_of: String
+    attribute :java_path,
+              kind_of: String
 
     attr_writer :exists
     attr_writer :connected
     attr_writer :online
-
-    def initialize(name, run_context = nil)
-      super
-
-      @resource_name = :jenkins_slave
-
-      # Set default actions and allowed actions
-      @action = :create
-      @allowed_actions.push(:create, :delete, :connect, :disconnect, :online, :offline)
-
-      # Set the name attribute and default attributes
-      @slave_name      = name
-      @remote_fs       = '/home/jenkins'
-      @executors       = 1
-      @usage_mode      = 'normal'
-      @labels          = []
-      @in_demand_delay = 0
-      @idle_delay      = 1
-      @user            = 'jenkins'
-
-      # State attributes that are set by the provider
-      @exists    = false
-      @connected = false
-      @online    = false
-    end
-
-    #
-    # The slave_name of the slave.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def slave_name(arg = nil)
-      set_or_return(:slave_name, arg, kind_of: String)
-    end
-
-    #
-    # The description of the slave.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def description(arg = nil)
-      set_or_return(:description, arg, kind_of: String)
-    end
-
-    #
-    # The remote directory on the slave where the master will install
-    # files required to run builds.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def remote_fs(arg = nil)
-      set_or_return(:remote_fs, arg, kind_of: String)
-    end
-
-    #
-    # The number of executors for the slave. This controls the number of
-    # concurrent builds that Jenkins can perform.
-    #
-    # @param [Integer] arg
-    # @return [Integer]
-    #
-    def executors(arg = nil)
-      set_or_return(:executors, arg, kind_of: Integer)
-    end
-
-    #
-    # Controls how Jenkins schedules builds on this machine.
-    #
-    # @param [String] arg
-    # @option arg [String] `exclusive` Utilize this slave as much as possible.
-    # @option arg [String] `normal` Leave this machine for tied jobs only.
-    # @return [String]
-    #
-    def usage_mode(arg = nil)
-      set_or_return(
-        :usage_mode,
-        arg,
-        kind_of: String,
-        equal_to: %w(exclusive normal),
-      )
-    end
-
-    #
-    # The list of labels for this slave.
-    #
-    # @param [String, Array<String>] arg
-    # @return [Array<String>]
-    #
-    def labels(arg = nil)
-      if arg.nil?
-        @labels
-      else
-        @labels += Array(arg).compact.map(&:to_s)
-      end
-    end
-
-    #
-    # Controls when Jenkins starts and stops a slave.
-    #
-    # @param [String] arg
-    # @option arg [String] `always` Keep this slave on-line as much as possible.
-    # @option arg [String] `demand` Take this slave on-line when in demand and off-line when idle.
-    # @return [String]
-    #
-    def availability(arg = nil)
-      set_or_return(
-        :availability,
-        arg,
-        kind_of: String,
-        equal_to: %w(always demand),
-      )
-    end
-
-    #
-    # The number of minutes for which jobs must be waiting in the queue
-    # before attempting to launch this slave. This value is only used
-    # when `availability` is set to `demand`.
-    #
-    # @param [Integer] arg
-    # @return [Integer]
-    #
-    def in_demand_delay(arg = nil)
-      set_or_return(:in_demand_delay, arg, kind_of: Integer)
-    end
-
-    #
-    # The number of minutes that this slave must remain idle before
-    # taking it off-line. This value is only used when `availability` is
-    # set to `demand`.
-    #
-    # @param [Integer] arg
-    # @return [Integer]
-    #
-    def idle_delay(arg = nil)
-      set_or_return(:idle_delay, arg, kind_of: Integer)
-    end
-
-    #
-    # A Hash of environment variables which are set directly on the
-    # slaves configuration. These key-value pairs apply for every build
-    # on this slave and override any global values. They can be used in
-    # Jenkins' configuration (as +$key+ or +${key}+) and be will added to
-    # the environment for processes launched from the build.
-    #
-    # @param [Hash] arg
-    # @return [Hash]
-    #
-    # @example Ruby 1.9+ style Hash
-    #   {ENV_VARIABLE: 'VALUE'}
-    # @example Ruby 1.8 style Hash
-    #   {'ENV_VARIABLE' => 'VALUE'}
-    #
-    def environment(arg = nil)
-      set_or_return(:environment, arg, kind_of: Hash)
-    end
-
-    #
-    # The reason a node is going offline.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def offline_reason(arg = nil)
-      set_or_return(:offline_reason, arg, kind_of: String)
-    end
-
-    #
-    # The user that the slave process runs as.
-    #
-    # On SSH slaves the Jenkins master will use this username to connect
-    # to the slave.
-    #
-    # On JNLP *nix slaves the user account will be created if it does not
-    # exist. On Windows systems users of the the following formats are
-    # supported:
-    #
-    #  * LocalSystem => Default. Service runs with the machine account.
-    #  * Administrator => Local Account
-    #  * domain\username => Domain Account
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def user(arg = nil)
-      set_or_return(
-        :user,
-        arg,
-        kind_of: String,
-        regex: Chef::Config[:user_valid_regex],
-      )
-    end
-
-    #
-    # Additional tuning parameters to pass the JVM process used to
-    # launch the slave.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def jvm_options(arg = nil)
-      set_or_return(:jvm_options, arg, kind_of: String)
-    end
 
     #
     # Determine if the slave exists on the master. This value is set by
@@ -243,7 +88,7 @@ class Chef
     # @return [Boolean]
     #
     def exists?
-      !!@exists
+      !@exists.nil? && @exists
     end
 
     #
@@ -253,7 +98,7 @@ class Chef
     # @return [Boolean]
     #
     def connected?
-      !!@connected
+      !@connected.nil? && @connected
     end
 
     #
@@ -263,22 +108,16 @@ class Chef
     # @return [Boolean]
     #
     def online?
-      !!@online
+      !@online.nil? && @online
     end
   end
 end
 
 class Chef
-  class Provider::JenkinsSlave < Provider
-    require_relative '_helper'
+  class Provider::JenkinsSlave < Provider::LWRPBase
     include Jenkins::Helper
 
-    #
-    # This provider supports why-run mode.
-    #
-    def whyrun_supported?
-      true
-    end
+    provides :jenkins_slave
 
     def load_current_resource
       @current_resource ||= Resource::JenkinsSlave.new(new_resource.name)
@@ -299,11 +138,15 @@ class Chef
     end
 
     #
-    # Create the given slave.
+    # This provider supports why-run mode.
     #
+    def whyrun_supported?
+      true
+    end
+
     def action_create
       if current_resource.exists? && correct_config?
-        Chef::Log.debug("#{new_resource} exists - skipping")
+        Chef::Log.info("#{new_resource} exists - skipping")
       else
         converge_by("Create #{new_resource}") do
           executor.groovy! <<-EOH.gsub(/ ^{12}/, '')
@@ -316,7 +159,7 @@ class Chef
             availability = #{convert_to_groovy(new_resource.availability)}
             usage_mode = #{convert_to_groovy(new_resource.usage_mode)}
             env_map = #{convert_to_groovy(new_resource.environment)}
-            labels = #{convert_to_groovy(new_resource.labels.sort.join("\s"))}
+            labels = #{convert_to_groovy(new_resource.labels.sort.join(' '))}
 
             // Compute the usage mode
             if (usage_mode == 'normal') {
@@ -373,9 +216,6 @@ class Chef
       end
     end
 
-    #
-    # Delete the given slave.
-    #
     def action_delete
       if current_resource.exists?
         converge_by("Delete #{new_resource}") do
@@ -386,9 +226,6 @@ class Chef
       end
     end
 
-    #
-    # Connect the given slave.
-    #
     def action_connect
       if current_resource.exists? && current_resource.connected?
         Chef::Log.debug("#{new_resource} already connected - skipping")
@@ -399,9 +236,6 @@ class Chef
       end
     end
 
-    #
-    # Connect the given slave.
-    #
     def action_disconnect
       if current_resource.connected?
         converge_by("Disconnect #{new_resource}") do
@@ -412,9 +246,6 @@ class Chef
       end
     end
 
-    #
-    # Take the given slave online.
-    #
     def action_online
       if current_resource.exists? && current_resource.online?
         Chef::Log.debug("#{new_resource} already online - skipping")
@@ -425,13 +256,10 @@ class Chef
       end
     end
 
-    #
-    # Take the given slave offline.
-    #
     def action_offline
       if current_resource.online?
         converge_by("Offline #{new_resource}") do
-          command_pieces  = [escape(new_resource.slave_name)]
+          command_pieces = [escape(new_resource.slave_name)]
           if new_resource.offline_reason
             command_pieces << "-m '#{escape(new_resource.offline_reason)}'"
           end
@@ -449,11 +277,10 @@ class Chef
     # launcher implementation. The launcher instance should be set to
     # a Groovy variable named `launcher`.
     #
-    # @abstract
     # @return [String]
     #
     def launcher_groovy
-      fail NotImplementedError, 'You must implement #launcher_groovy.'
+      'launcher = new hudson.slaves.JNLPLauncher()'
     end
 
     #
@@ -500,6 +327,11 @@ class Chef
           return null
         }
 
+        def slave_environment = null
+        slave_env_vars = slave.nodeProperties.get(EnvironmentVariablesNodeProperty.class)?.envVars
+        if (slave_env_vars)
+          slave_environment = new java.util.HashMap<String,String>(slave_env_vars)
+
         current_slave = [
           name:slave.name,
           description:slave.nodeDescription,
@@ -507,7 +339,7 @@ class Chef
           executors:slave.numExecutors.toInteger(),
           usage_mode:slave.mode.toString().toLowerCase(),
           labels:slave.labelString.split().sort(),
-          environment:slave.nodeProperties.get(EnvironmentVariablesNodeProperty.class)?.envVars,
+          environment:slave_environment,
           connected:(slave.computer.connectTime > 0),
           online:slave.computer.online
         ]
@@ -554,7 +386,7 @@ class Chef
         usage_mode:   new_resource.usage_mode,
         labels:       new_resource.labels.sort,
         availability: new_resource.availability,
-        environment:  new_resource.environment,
+        environment:  new_resource.environment
       }
 
       if new_resource.availability.to_s == 'demand'
@@ -574,3 +406,8 @@ class Chef
     end
   end
 end
+
+Chef::Platform.set(
+  resource: :jenkins_slave,
+  provider: Chef::Provider::JenkinsSlave
+)

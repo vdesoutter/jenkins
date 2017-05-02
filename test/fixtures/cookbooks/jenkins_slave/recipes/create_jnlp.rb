@@ -1,4 +1,6 @@
-include_recipe 'jenkins::master'
+include_recipe 'jenkins_server_wrapper::default'
+
+return if docker? # the runit_service resource has issues under Docker
 
 #
 # JNLP
@@ -39,6 +41,6 @@ jenkins_jnlp_slave 'executor' do
   group        'jenkins-executor'
   environment(
     'FOO' => 'bar',
-    'BAZ' => 'qux',
+    'BAZ' => 'qux'
   )
 end

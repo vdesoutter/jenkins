@@ -4,7 +4,7 @@
 #
 # Author: Doug MacEachern <dougm@vmware.com>
 # Author: Fletcher Nichol <fnichol@nichol.ca>
-# Author: Seth Chisamore <schisamo@getchef.com>
+# Author: Seth Chisamore <schisamo@chef.io>
 # Author: Seth Vargo <sethvargo@gmail.com>
 #
 # Copyright 2010, VMware, Inc.
@@ -70,13 +70,13 @@ default['jenkins']['master'].tap do |master|
   # Warning: Setting this attribute will negate/ignore any values for +mirror+
   # and +version+.
   #
-  master['source'] = "#{jenkins['master']['mirror']}/war/#{jenkins['master']['version'] || 'latest'}/jenkins.war"
+  master['source'] = "#{node['jenkins']['master']['mirror']}/war/#{node['jenkins']['master']['version'] || 'latest'}/jenkins.war"
 
   #
   # The checksum of the war file. This is use to verify that the remote war file
   # has not been tampered with (such as a MITM attack). If you leave this #
   # attribute set to +nil+, no validation will be performed. If this attribute
-  # is set to the wrong MD5 checksum, the Chef Client run will fail.
+  # is set to the wrong SHA-256 checksum, the Chef Client run will fail.
   #
   #   node.set['jenkins']['master']['checksum'] = 'abcd1234...'
   #
@@ -126,6 +126,15 @@ default['jenkins']['master'].tap do |master|
   master['group'] = 'jenkins'
 
   #
+  # Jenkins user/group should be created as `system` accounts for `war` install.
+  # The default of `true` will ensure that **new** jenkins user accounts are
+  # created in the system ID range, exisitng users will not be modified.
+  #
+  #   node.set['jenkins']['master']['use_system_accounts'] = false
+  #
+  master['use_system_accounts'] = true
+
+  #
   # The host the Jenkins master is running on. For single-installs, the default
   # value of +localhost+ will suffice. For multi-node installs, you will likely
   # need to update this attribute to the FQDN of your Jenkins master.
@@ -155,7 +164,7 @@ default['jenkins']['master'].tap do |master|
   #
   #   node.set['jenkins']['master']['endpoint'] = 'https://custom.domain.com/jenkins'
   #
-  master['endpoint'] = "http://#{jenkins['master']['host']}:#{jenkins['master']['port']}"
+  master['endpoint'] = "http://#{node['jenkins']['master']['host']}:#{node['jenkins']['master']['port']}"
 
   #
   # The path to the Jenkins home location. This will also become the value of
@@ -174,4 +183,41 @@ default['jenkins']['master'].tap do |master|
   #   node.set['jenkins']['master']['log_directory'] = '/var/log/jenkins'
   #
   master['log_directory'] = '/var/log/jenkins'
+
+  #
+  # The timeout passed to the runit cookbook's service resource. Override the
+  # default timeout of 7 seconds. This option implies verbose.
+  #
+  #   node.set['jenkins']['master']['runit']['sv_timeout'] = 60
+  #
+  master['runit']['sv_timeout'] = 7
+
+  #
+  # The limits for the Java process running the master server.
+  # Example to configure the maximum number of open file descriptors:
+  #
+  #   node.set['jenkins']['master']['ulimits'] = { 'n' => 8192 }
+  #
+  master['ulimits'] = nil
+
+  #
+  # Repository URL. Default is latest
+  #
+  master['repository'] = case node['platform_family']
+                         when 'debian' then 'http://pkg.jenkins-ci.org/debian'
+                         when 'rhel' then 'http://pkg.jenkins-ci.org/redhat'
+                         end
+
+  #
+  # Repository key. Default is latest
+  #
+  master['repository_key'] = case node['platform_family']
+                             when 'debian' then 'http://pkg.jenkins-ci.org/debian/jenkins-ci.org.key'
+                             when 'rhel' then 'http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key'
+                             end
+
+  #
+  # Keyserver to use. Disabled by default
+  #
+  master['repository_keyserver'] = nil
 end

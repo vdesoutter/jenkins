@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # Recipe:: java
 #
-# Author: Seth Vargo <sethvargo@getchef.com>
+# Author: Seth Vargo <sethvargo@chef.io>
 #
 # Copyright 2014, Chef Software, Inc.
 #
@@ -39,5 +39,5 @@ when 'debian'
 when 'rhel'
   package 'java-1.7.0-openjdk'
 else
-  fail "`#{node['platform_family']}' is not supported!"
+  raise "`#{node['platform_family']}' is not supported!"
 end

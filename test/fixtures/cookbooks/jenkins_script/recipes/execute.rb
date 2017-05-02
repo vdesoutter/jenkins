@@ -1,4 +1,4 @@
-include_recipe 'jenkins::master'
+include_recipe 'jenkins_server_wrapper::default'
 
 # Execute a simple script
 jenkins_script 'println("This is Groovy code!")'
@@ -12,7 +12,7 @@ jenkins_script 'create user' do
     user = hudson.model.User.get('yzl')
     user.setFullName('Yvonne Lam')
 
-    email = new hudson.tasks.Mailer.UserProperty('yzl@getchef.com')
+    email = new hudson.tasks.Mailer.UserProperty('yzl@chef.io')
     user.addProperty(email)
 
     user.save()

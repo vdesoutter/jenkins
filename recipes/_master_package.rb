@@ -26,9 +26,12 @@ when 'debian'
   include_recipe 'apt::default'
 
   apt_repository 'jenkins' do
-    uri          'http://pkg.jenkins-ci.org/debian'
+    uri          node['jenkins']['master']['repository']
     distribution 'binary/'
-    key          'https://jenkins-ci.org/debian/jenkins-ci.org.key'
+    key          node['jenkins']['master']['repository_key']
+    unless node['jenkins']['master']['repository_keyserver'].nil?
+      keyserver    node['jenkins']['master']['repository_keyserver']
+    end
   end
 
   package 'jenkins' do
@@ -44,12 +47,21 @@ when 'rhel'
   include_recipe 'yum::default'
 
   yum_repository 'jenkins-ci' do
-    baseurl 'http://pkg.jenkins-ci.org/redhat'
-    gpgkey  'https://jenkins-ci.org/redhat/jenkins-ci.org.key'
+    baseurl node['jenkins']['master']['repository']
+    gpgkey  node['jenkins']['master']['repository_key']
   end
 
   package 'jenkins' do
     version node['jenkins']['master']['version']
+  end
+
+  # The package install creates the Jenkins user so now is the time to set the home
+  # directory permissions.
+  directory node['jenkins']['master']['home'] do
+    owner     node['jenkins']['master']['user']
+    group     node['jenkins']['master']['group']
+    mode      '0755'
+    recursive true
   end
 
   template '/etc/sysconfig/jenkins' do
@@ -61,5 +73,5 @@ end
 
 service 'jenkins' do
   supports status: true, restart: true, reload: true
-  action  [:enable, :start]
+  action [:enable, :start]
 end

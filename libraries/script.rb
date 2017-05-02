@@ -20,26 +20,35 @@
 #
 
 require_relative 'command'
+require_relative '_params_validate'
 
 class Chef
   class Resource::JenkinsScript < Resource::JenkinsCommand
-    def initialize(name, run_context = nil)
-      super
+    resource_name :jenkins_script
 
-      # Set the resource name and provider
-      @resource_name = :jenkins_script
-      @provider = Provider::JenkinsScript
-    end
+    # Actions
+    actions :execute
+    default_action :execute
   end
 end
 
 class Chef
   class Provider::JenkinsScript < Provider::JenkinsCommand
+    provides :jenkins_script
+
     def load_current_resource
       @current_resource ||= Resource::JenkinsScript.new(new_resource.command)
+      super
     end
 
-    def action_execute
+    #
+    # This provider supports why-run mode.
+    #
+    def whyrun_supported?
+      true
+    end
+
+    action(:execute) do
       converge_by("Execute script #{new_resource}") do
         executor.groovy!(new_resource.command)
       end

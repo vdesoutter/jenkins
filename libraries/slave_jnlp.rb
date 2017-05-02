@@ -2,7 +2,7 @@
 # Cookbook Name:: jenkins
 # HWRP:: jnlp_slave
 #
-# Author:: Seth Chisamore <schisamo@getchef.com>
+# Author:: Seth Chisamore <schisamo@chef.io>
 #
 # Copyright 2013-2014, Chef Software, Inc.
 #
@@ -19,70 +19,42 @@
 # limitations under the License.
 #
 
-require 'uri'
+require_relative '_params_validate'
 require_relative 'slave'
 
 class Chef
-  class Resource::JenkinsJNLPSlave < Resource::JenkinsSlave
-    provides :jenkins_jnlp_slave
+  class Resource::JenkinsJnlpSlave < Resource::JenkinsSlave
+    resource_name :jenkins_jnlp_slave
 
-    def initialize(name, run_context = nil)
-      super
+    # Actions
+    actions :create, :delete, :connect, :disconnect, :online, :offline
+    default_action :create
 
-      # Set the resource name and provider
-      @resource_name = :jenkins_jnlp_slave
-      @provider = Provider::JenkinsJNLPSlave
-
-      # Set the default attributes
-      @group           = 'jenkins'
-      @service_name    = 'jenkins-slave'
-    end
-
-    #
-    # Group slave prcess runs as. On *nix systems the group will be
-    # created if it does not exist.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def group(arg = nil)
-      set_or_return(
-        :group,
-        arg,
-        kind_of: String,
-        regex: Chef::Config[:group_valid_regex],
-      )
-    end
-
-    #
-    # Name of the service that manages the slave process.
-    #
-    # @param [String] arg
-    # @return [String]
-    #
-    def service_name(arg = nil)
-      set_or_return(:service_name, arg, kind_of: String)
-    end
+    # Attributes
+    attribute :group,
+              kind_of: String,
+              default: 'jenkins',
+              regex: Config[:group_valid_regex]
+    attribute :service_name,
+              kind_of: String,
+              default: 'jenkins-slave'
   end
 end
 
 class Chef
-  class Provider::JenkinsJNLPSlave < Provider::JenkinsSlave
-    def load_current_resource
-      @current_resource ||= Resource::JenkinsJNLPSlave.new(new_resource.name)
+  class Provider::JenkinsJnlpSlave < Provider::JenkinsSlave
+    provides :jenkins_jnlp_slave
 
+    def load_current_resource
+      @current_resource ||= Resource::JenkinsJnlpSlave.new(new_resource.name)
       super
     end
 
-    #
-    # @see Chef::Resource::JenkinsSlave#action_create
-    #
     def action_create
       super
 
       parent_remote_fs_dir_resource.run_action(:create)
 
-      # don't create user/group on Windows
       unless Chef::Platform.windows?
         group_resource.run_action(:create)
         user_resource.run_action(:create)
@@ -91,12 +63,14 @@ class Chef
       remote_fs_dir_resource.run_action(:create)
       slave_jar_resource.run_action(:create)
 
-      service_resource.run_action(:enable) unless Chef::Platform.windows?
+      # The Windows's specific child class manages it's own service
+      return if Chef::Platform.windows?
+
+      service_resource.run_action(:enable)
+      # We need to restart the service if the slave jar is updated
+      service_resource.run_action(:restart) if slave_jar_resource.updated?
     end
 
-    #
-    # @see Chef::Resource::JenkinsSlave#action_delete
-    #
     def action_delete
       # Stop and remove the service
       service_resource.run_action(:disable)
@@ -158,7 +132,7 @@ class Chef
     # @return [String]
     #
     def slave_jar
-      ::File.join(Chef::Config[:file_cache_path], 'slave.jar')
+      ::File.join(new_resource.remote_fs, 'slave.jar')
     end
 
     # Embedded Resources
@@ -171,9 +145,9 @@ class Chef
     # @return [Chef::Resource::Group]
     #
     def group_resource
-      return @group_resource if @group_resource
-      @group_resource = Chef::Resource::Group.new(new_resource.group, run_context)
-      @group_resource
+      @group_resource ||= build_resource(:group, new_resource.group) do
+        system(node['jenkins']['master']['use_system_accounts'])
+      end
     end
 
     #
@@ -184,12 +158,12 @@ class Chef
     # @return [Chef::Resource::User]
     #
     def user_resource
-      return @user_resource if @user_resource
-      @user_resource = Chef::Resource::User.new(new_resource.user, run_context)
-      @user_resource.gid(new_resource.group)
-      @user_resource.comment('Jenkins slave user - Created by Chef')
-      @user_resource.home(new_resource.remote_fs)
-      @user_resource
+      @user_resource ||= build_resource(:user, new_resource.user) do
+        gid(new_resource.group)
+        comment('Jenkins slave user - Created by Chef')
+        home(new_resource.remote_fs)
+        system(node['jenkins']['master']['use_system_accounts'])
+      end
     end
 
     #
@@ -200,12 +174,13 @@ class Chef
     # @return [Chef::Resource::Directory]
     #
     def parent_remote_fs_dir_resource
-      return @parent_remote_fs_dir_resource if @parent_remote_fs_dir_resource
-
-      path = ::File.expand_path(new_resource.remote_fs, '..')
-      @parent_remote_fs_dir_resource = Chef::Resource::Directory.new(path, run_context)
-      @parent_remote_fs_dir_resource.recursive(true)
-      @parent_remote_fs_dir_resource
+      @parent_remote_fs_dir_resource ||=
+        begin
+          path = ::File.expand_path(new_resource.remote_fs, '..')
+          build_resource(:directory, path) do
+            recursive(true)
+          end
+        end
     end
 
     #
@@ -216,12 +191,11 @@ class Chef
     # @return [Chef::Resource::Directory]
     #
     def remote_fs_dir_resource
-      return @remote_fs_dir_resource if @remote_fs_dir_resource
-      @remote_fs_dir_resource = Chef::Resource::Directory.new(new_resource.remote_fs, run_context)
-      @remote_fs_dir_resource.owner(new_resource.user)
-      @remote_fs_dir_resource.group(new_resource.group)
-      @remote_fs_dir_resource.recursive(true)
-      @remote_fs_dir_resource
+      @remote_fs_dir_resource ||= build_resource(:directory, new_resource.remote_fs) do
+        owner(new_resource.user)
+        group(new_resource.group)
+        recursive(true)
+      end
     end
 
     #
@@ -232,12 +206,16 @@ class Chef
     # @return [Chef::Resource::RemoteFile]
     #
     def slave_jar_resource
-      return @slave_jar_resource if @slave_jar_resource
-      @slave_jar_resource = Chef::Resource::RemoteFile.new(slave_jar, run_context)
-      @slave_jar_resource.source(slave_jar_url)
-      @slave_jar_resource.backup(false)
-      @slave_jar_resource.mode('0755')
-      @slave_jar_resource
+      @slave_jar_resource ||=
+        begin
+          build_resource(:remote_file, slave_jar).tap do |r|
+            # We need to use .tap() to access methods in the provider's scope.
+            r.source slave_jar_url
+            r.backup(false)
+            r.mode('0755')
+            r.atomic_update(false)
+          end
+        end
     end
 
     #
@@ -248,25 +226,25 @@ class Chef
     # @return [Chef::Resource::RunitService]
     #
     def service_resource
-      return @service_resource if @service_resource
+      @service_resource ||=
+        begin
+          # Ensure runit is installed on the slave.
+          include_recipe 'runit'
 
-      # Ensure runit is installed on the slave.
-      recipe_eval do
-        run_context.include_recipe 'runit'
-      end
-
-      @service_resource = Chef::Resource::RunitService.new(new_resource.service_name, run_context)
-      @service_resource.cookbook('jenkins')
-      @service_resource.run_template_name('jenkins-slave')
-      @service_resource.log_template_name('jenkins-slave')
-      @service_resource.options(
-        new_resource: new_resource,
-        java_bin:    java,
-        slave_jar:   slave_jar,
-        jnlp_url:    jnlp_url,
-        jnlp_secret: jnlp_secret,
-      )
-      @service_resource
+          build_resource(:runit_service, new_resource.service_name).tap do |r|
+            # We need to use .tap() to access methods in the provider's scope.
+            r.cookbook('jenkins')
+            r.run_template_name('jenkins-slave')
+            r.log_template_name('jenkins-slave')
+            r.options(
+              new_resource: new_resource,
+              java_bin:    java,
+              slave_jar:   slave_jar,
+              jnlp_url:    jnlp_url,
+              jnlp_secret: jnlp_secret
+            )
+          end
+        end
     end
   end
 end
