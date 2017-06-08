@@ -68,6 +68,11 @@ module Jenkins
     #
     def execute!(*pieces)
       command_options = pieces.last.is_a?(Hash) ? pieces.pop : {}
+      # FIXME:
+      # hijack restart with safe-restart as we have an NPE
+      # in 2.46.3
+      # https://issues.jenkins-ci.org/browse/JENKINS-31448
+      pieces[-1] = "safe-restart" if pieces.last == "restart"
       command = []
       command << %("#{options[:java]}")
       command << %(-jar "#{options[:cli]}")
