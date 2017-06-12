@@ -126,6 +126,19 @@ module Jenkins
     end
 
     #
+    # Return the string used by jenkins cli to make the master execute
+    # the groovy command contained in the file given as argument.
+    #
+    # @param [String] filePath
+    #   the path to the file contaning the groovy code to execute
+    #
+    # @return [String]
+    #   the command to send to execute
+    def groovy_command(filePath)
+         return "groovy #{filePath}"
+    end
+
+    #
     # Execute the given inline groovy script, raising exceptions if something
     # fails.
     #
@@ -139,7 +152,7 @@ module Jenkins
       file = Tempfile.new('groovy')
       file.write script
       file.flush
-      execute!("groovy #{file.path}")
+      execute!(groovy_command(file.path))
     ensure
       file.close! if file
     end
@@ -153,7 +166,7 @@ module Jenkins
       file = Tempfile.new('groovy')
       file.write script
       file.flush
-      execute("groovy #{file.path}")
+      execute(groovy_command(file.path))
     ensure
       file.close! if file
     end
