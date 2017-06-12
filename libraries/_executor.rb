@@ -135,7 +135,7 @@ module Jenkins
     # @return [String]
     #   the command to send to execute
     def groovy_command(filePath)
-         return "-remoting groovy #{filePath}"
+      return "-remoting groovy #{filePath}"
     end
 
     #
