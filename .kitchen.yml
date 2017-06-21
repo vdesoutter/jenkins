@@ -61,6 +61,14 @@ suites:
           install_method: war
           source: https://updates.jenkins.io/latest/jenkins.war
 
+  - name: smoke_war_criteo
+    run_list: jenkins_smoke::default
+    attributes:
+      jenkins:
+        master:
+          install_method: war
+          source: https://updates.jenkins.io/stable/latest/jenkins.war
+
   #
   # Authentication suites
   #
