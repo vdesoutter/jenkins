@@ -52,4 +52,14 @@ default['jenkins']['executor'].tap do |executor|
   #   node.set['jenkins']['executor']['ulimits'] = { 'n' => 8192 }
   #
   executor['ulimits'] = nil
+
+  #
+  # CLI protocol [ssh|http|remoting]
+  #
+  executor['protocol'] = 'remoting'
+
+  #
+  # CLI user to pass for ssh/https protocol
+  #
+  # executor['cli_user'] = 'example_chef_user'
 end
