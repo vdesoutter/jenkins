@@ -70,6 +70,8 @@ EOH
         h[:timeout]  = timeout if timeout_given?
         h[:username] = username unless username.nil?
         h[:password] = password unless password.nil?
+        h[:protocol] = protocol unless protocol.nil?
+        h[:cli_user] = cli_user unless cli_user.nil?
       end
 
       Jenkins::Executor.new(options)
@@ -343,6 +345,26 @@ EOH
     #
     def java
       node['jenkins']['java']
+    end
+
+    #
+    # protocol to pass to cli
+    # ssh/http/remoting
+    #
+    # @return [String]
+    #
+    def protocol
+      node['jenkins']['executor']['protocol']
+    end
+
+    #
+    # CLI user to pass to cli
+    # ssh protocol or http protocol needs it
+    #
+    # @return [String]
+    #
+    def cli_user
+      node['jenkins']['executor']['cli_user']
     end
 
     #
