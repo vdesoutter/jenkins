@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: slave
+# Resource:: slave
 #
 # Author:: Seth Chisamore <schisamo@chef.io>
 #
@@ -117,7 +117,7 @@ end
 class Chef
   class Provider::JenkinsSlave < Provider::LWRPBase
     provides :jenkins_slave
-    use_inline_resources
+    use_inline_resources # ~FC113
 
     include Jenkins::Helper
 
@@ -152,7 +152,13 @@ class Chef
       do_create
     end
 
+    def merge_preserved_labels!
+      new_resource.labels |= current_resource.labels.select { |i| i[/^prsrv_/] }
+    end
+
     def do_create
+      # Preserve some labels...
+      merge_preserved_labels!
       if current_resource.exists? && correct_config?
         Chef::Log.info("#{new_resource} exists - skipping")
       else
@@ -272,9 +278,7 @@ class Chef
       if current_resource.online?
         converge_by("Offline #{new_resource}") do
           command_pieces = [escape(new_resource.slave_name)]
-          if new_resource.offline_reason
-            command_pieces << "-m '#{escape(new_resource.offline_reason)}'"
-          end
+          command_pieces << "-m '#{escape(new_resource.offline_reason)}'" if new_resource.offline_reason
           executor.execute!('offline-node', command_pieces)
         end
       else
@@ -389,14 +393,14 @@ class Chef
     #
     def correct_config?
       wanted_slave = {
-        name:         new_resource.slave_name,
-        description:  new_resource.description,
-        remote_fs:    new_resource.remote_fs,
-        executors:    new_resource.executors,
-        usage_mode:   new_resource.usage_mode,
-        labels:       new_resource.labels.sort,
+        name: new_resource.slave_name,
+        description: new_resource.description,
+        remote_fs: new_resource.remote_fs,
+        executors: new_resource.executors,
+        usage_mode: new_resource.usage_mode,
+        labels: new_resource.labels.sort,
         availability: new_resource.availability,
-        environment:  new_resource.environment,
+        environment: new_resource.environment,
       }
 
       if new_resource.availability.to_s == 'demand'

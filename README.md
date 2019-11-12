@@ -1,4 +1,4 @@
-# jenkins Cookbook -
+# jenkins Cookbook 
 
 [![Build Status](https://travis-ci.org/chef-cookbooks/jenkins.svg?branch=master)](https://travis-ci.org/chef-cookbooks/jenkins) [![Cookbook Version](https://img.shields.io/cookbook/v/jenkins.svg)](https://supermarket.chef.io/cookbooks/jenkins)
 
@@ -14,11 +14,10 @@ Installs and configures Jenkins CI master & node slaves. Resource providers to s
 
 ### Chef
 
-- Chef 12.1+
+- Chef 13.0+
 
 ### Cookbooks
 
-- compat_resource
 - runit
 
 #### Java cookbook
@@ -42,15 +41,19 @@ The master recipe will create the required directory structure and install jenki
 - `package` - Install Jenkins from the official jenkins-ci.org packages
 - `war` - Download the latest version of the WAR file and configure it with Runit
 
-## Resource/Provider
+## Resources
 
 ### jenkins_command
 
-This resource executes arbitrary commands against the [Jenkins CLI](https://wiki.jenkins-ci.org/display/JENKINS/Jenkins+CLI), supporting the following actions:
+This resource executes arbitrary commands against the [Jenkins CLI](https://wiki.jenkins-ci.org/display/JENKINS/Jenkins+CLI)
 
-```
-:execute
-```
+#### Actions
+
+- :execute
+
+#### Examples
+
+To perform a restart
 
 ```ruby
 jenkins_command 'safe-restart'
@@ -74,9 +77,15 @@ jenkins_command 'quiet-down'
 
 This resource executes arbitrary Java or Groovy commands against the Jenkins master. By the nature of this command, it is **not** idempotent.
 
+#### Examples
+
+A simple inline Groovy script
+
 ```ruby
 jenkins_script 'println("This is Groovy code!")'
 ```
+
+More complex inline Groovy
 
 ```ruby
 jenkins_script 'add_authentication' do
@@ -103,6 +112,25 @@ jenkins_script 'add_authentication' do
 end
 ```
 
+Executing Groovy code on disk
+
+```ruby
+template ::File.join(Chef::Config[:file_cache_path], 'create_jenkins_user' + '.groovy') do
+  source "create_jenkins_user.groovy.erb"
+  mode '0644'
+  owner 'jenkins'
+  group 'jenkins'
+  variables(
+    users: users
+  )
+  notifies :execute, "jenkins_script[create_jenkins_user]", :immediately
+end
+
+jenkins_script 'create_jenkins_user' do
+  groovy_path ::File.join(Chef::Config[:file_cache_path], 'create_jenkins_user' + '.groovy')
+end
+```
+
 ### jenkins_credentials
 
 **NOTES**
@@ -111,29 +139,28 @@ end
 
 - In version `4.0.0` of this cookbook this resource was changed so that credentials are referenced by their ID instead of by their name. If you are upgrading your nodes from an earlier version of this cookbook ( <= 3.1.1 ), use the credentials resource and do not have explicit IDs assigned to credentials, you will need to go into the Jenkins UI, find the auto-generated UUIDs for your credentials, and add them to your cookbook resources.
 
---------------------------------------------------------------------------------
+#### Actions
 
-This resource uses the Jenkins Groovy API to manage credentials and supports the following actions:
-
-```
-:create, :delete
-```
+- :create
+- :delete
 
 Both actions operate on the credential resources idempotently. It also supports why-run mode.
 
 `jenkins_credentials` is a base resource that is not used directly. Instead there are resources for each specific type of credentials supported.
 
-### Common attributes
+### Properties
 
-Use of the credential resource requires a unique `id` attribute. The resource uses this ID to find the credential for future modifications, and it is an immutable resource once the resource is created within Jenkins. This ID is also how you reference the credentials in other Groovy scripts (i.e. Pipeline code).
+Use of the credential resource requires a unique `id` property. The resource uses this ID to find the credential for future modifications, and it is an immutable resource once the resource is created within Jenkins. This ID is also how you reference the credentials in other Groovy scripts (i.e. Pipeline code).
 
-The `username` attribute (also the name attribute) corresponds to the username of the credentials on the target node.
+The `username` property (also the name property) corresponds to the username of the credentials on the target node.
 
 You may also specify a `description` which is useful in credential identification.
 
 #### jenkins_password_credentials
 
 Basic username + password credentials.
+
+##### Examples
 
 ```ruby
 # Create password credentials
@@ -155,6 +182,8 @@ end
 #### jenkins_private_key_credentials
 
 Credentials that use a username + private key (optionally protected with a passphrase).
+
+##### Examples
 
 ```ruby
 # Create private key credentials
@@ -181,9 +210,11 @@ jenkins_private_key_credentials 'wcoyote' do
 end
 ```
 
-### jenkins_secret_text_credentials
+#### jenkins_secret_text_credentials
 
 Generic secret text. Requires the the `credentials-binding` plugin.
+
+##### Examples
 
 ```ruby
 # Create secret text credentials
@@ -202,6 +233,28 @@ jenkins_secret_text_credentials 'wcoyote' do
 end
 ```
 
+### jenkins_file_credentials
+
+Generic file credentials.
+
+```ruby
+# Create file credentials
+jenkins_file_credentials 'wcoyote' do
+  id          'wcoyote-file'
+  description 'Wile E Coyote File'
+  filename    'file.txt'
+  data        'my file content'
+end
+```
+
+```ruby
+# Delete file credentials
+jenkins_file_credentials 'wcoyote' do
+  id     'wcoyote-file'
+  action :delete
+end
+```
+
 #### Scopes
 
 Credentials in Jenkins can be created with 2 different "scopes" which determines where the credentials can be used:
@@ -213,11 +266,15 @@ The credentials created with the `jenkins_credentials` resources are assigned a 
 
 ### jenkins_job
 
-This resource manages Jenkins jobs, supporting the following actions:
+This resource manages Jenkins jobs
 
-```
-:create, :delete, :disable, :enable, :build
-```
+#### Actions
+
+- :create
+- :delete
+- :disable
+- :enable
+- :build
 
 The resource is fully idempotent and convergent. It also supports why-run mode.
 
@@ -276,38 +333,116 @@ jenkins_job 'my-parameterized-job' do
 end
 ```
 
+### jenkins_view
+
+This resource manages Jenkins view
+
+#### Actions
+
+- :create
+- :delete
+
+The resource is fully idempotent and convergent as long as you're not using free hand code. It also supports whyrun mode.
+
+The `:create` action requires an array of jobs:
+
+```ruby
+jenkins_view 'ham' do
+  jobs [ "pig", "giraffe" ]
+end
+```
+
+The `:delete` action deleted a configured view:
+
+```ruby
+jenkins_view 'ham' do
+  action :delete
+end
+```
+
+It is possible to pass a snippet of groovy code in order to create more sophisticated views, the idea is to override the `create_view` and `configure_view` groovy closures.
+
+```ruby
+code = <<-GROOVY
+create_view = { name ->
+  // Return a new view
+  return new BuildPipelineView(...)
+}
+
+configure_view = { view ->
+  // Configure view
+  view.setCssUrl("")
+}
+GROOVY
+
+jenkins_view 'pipline_view' do
+  code    code
+  action :create
+end
+```
+
+Please note that if you pass `code`, it will always run the `:create` action as the provider cannot determine when a change has to be made and when not.
+
+### jenkins_proxy
+
+This resource manages Jenkins HTTP proxy information
+
+#### Actions
+
+- :config
+- :remove
+
+This uses the Jenkins groovy API to configure the HTTP proxy information, that is provided on the _Advanced_ tab of the _Plugin Manager_.
+
+The `:config` action idempotently configure the Jenkins HTTP proxy information on the current node. The proxy attribute corresponds to the proxy server name and port number that have to use on the target node. You may also specify a list of no proxy host names with the noproxy attribute. The default is _localhost_ and _127.0.0.1_.
+
+```ruby
+# Basic proxy configuration
+jenkins_proxy '1.2.3.4:5678'
+
+# Expanded proxy configuration
+jenkins_proxy '5.6.7.8:9012' do
+  noproxy ['localhost', '127.0.0.1', 'nohost', '*.nodomain']
+end
+```
+
+The `:remove` action removes the Jenkins HTTP proxy information from the system.
+
+```ruby
+jenkins_proxy '1.2.3.4:5678' do
+  action :remove
+end
+```
+
 ### jenkins_plugin
 
-This resource manages Jenkins plugins, supporting the following actions:
+This resource manages Jenkins plugins.
 
-```
-:install, :uninstall, :enable, :disable
-```
+#### Actions
+
+- :install
+- :uninstall
+- :enable
+- :disable
 
 This uses the Jenkins CLI to install plugins. By default, it does a cold deploy, meaning the plugin is installed while Jenkins is still running. Some plugins may require you restart the Jenkins instance for their changed to take affect.
 
-- **A plugin's dependencies are also installed by default, this behavior can be disabled by setting the `install_deps` attribute to `false`.**
-- **This resource does not install plugin dependencies from a a given hpi/jpi URL - you must specify all plugin dependencies or Jenkins may not startup correctly!**
+- **This resource does not install plugin dependencies from a a given hpi/jpi URL or a specific version - you must specify all plugin dependencies or Jenkins may not startup correctly!**
 
 The `:install` action idempotently installs a Jenkins plugin on the current node. The name attribute corresponds to the name of the plugin on the Jenkins Update Center. You can also specify a particular version of the plugin to install. Finally, you can specify a full source URL or local path (on the node) to a plugin.
 
 ```ruby
-# Install the latest version of the greenballs plugin
+# Install the latest version of the greenballs plugin and all dependencies
 jenkins_plugin 'greenballs'
 
-# Install version 1.3 of the greenballs plugin
+# Install version 1.3 of the greenballs plugin and no dependencies
 jenkins_plugin 'greenballs' do
   version '1.3'
 end
 
-# Install a plugin from a given hpi (or jpi)
+# Install a plugin from a given hpi (or jpi) and no dependencies
 jenkins_plugin 'greenballs' do
   source 'http://updates.jenkins-ci.org/download/plugins/greenballs/1.10/greenballs.hpi'
-end
-
-# Don't install a plugins dependencies
-jenkins_plugin 'github-oauth' do
-  install_deps false
 end
 ```
 
@@ -418,6 +553,9 @@ jenkins_jnlp_slave 'smoke' do
   in_demand_delay 1
   idle_delay      3
   labels          ['runner', 'fast']
+
+  # User's groups to be configured with the runit service.
+  runit_groups    ['jenkins', 'docker']
 end
 
 # Create a slave with a full environment

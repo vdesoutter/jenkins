@@ -23,21 +23,19 @@
 
 case node['platform_family']
 when 'debian'
-  package 'apt-transport-https'
+  package %w( apt-transport-https fontconfig )
 
   apt_repository 'jenkins' do
     uri          node['jenkins']['master']['repository']
     distribution 'binary/'
     key          node['jenkins']['master']['repository_key']
-    unless node['jenkins']['master']['repository_keyserver'].nil?
-      keyserver    node['jenkins']['master']['repository_keyserver']
-    end
+    keyserver    node['jenkins']['master']['repository_keyserver'] unless node['jenkins']['master']['repository_keyserver'].nil?
   end
 
   dpkg_autostart 'jenkins' do
     allow false
   end
-when 'rhel'
+when 'rhel', 'amazon'
   yum_repository 'jenkins-ci' do
     baseurl node['jenkins']['master']['repository']
     gpgkey  node['jenkins']['master']['repository_key']
@@ -55,6 +53,25 @@ directory node['jenkins']['master']['home'] do
   recursive true
 end
 
+# Create the log directory
+directory node['jenkins']['master']['log_directory'] do
+  owner     node['jenkins']['master']['user']
+  group     node['jenkins']['master']['group']
+  mode      '0755'
+  recursive true
+end
+
+# Create/fix permissions on supplemental directories
+%w(cache lib run).each do |folder|
+  directory "fix permissions for /var/#{folder}/jenkins" do
+    path "/var/#{folder}/jenkins"
+    owner node['jenkins']['master']['user']
+    group node['jenkins']['master']['group']
+    mode '0755'
+    action :create
+  end
+end
+
 case node['platform_family']
 when 'debian'
   template '/etc/default/jenkins' do
@@ -62,7 +79,7 @@ when 'debian'
     mode     '0644'
     notifies :restart, 'service[jenkins]', :immediately
   end
-when 'rhel'
+when 'rhel', 'amazon'
   template '/etc/sysconfig/jenkins' do
     source   'jenkins-config-rhel.erb'
     mode     '0644'

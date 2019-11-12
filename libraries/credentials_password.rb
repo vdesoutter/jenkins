@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: credentials_password
+# Resource:: credentials_password
 #
 # Author:: Seth Chisamore <schisamo@chef.io>
 #
@@ -36,7 +36,7 @@ end
 
 class Chef
   class Provider::JenkinsPasswordCredentials < Provider::JenkinsUserCredentials
-    use_inline_resources
+    use_inline_resources # ~FC113
     provides :jenkins_password_credentials
 
     def load_current_resource
@@ -44,9 +44,7 @@ class Chef
 
       super
 
-      if current_credentials
-        @current_resource.password(current_credentials[:password])
-      end
+      @current_resource.password(current_credentials[:password]) if current_credentials
 
       @current_resource
     end

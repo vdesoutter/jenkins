@@ -50,8 +50,8 @@ module Jenkins
     #
     def initialize(options = {})
       @options = {
-        cli:     '/usr/share/jenkins/cli/java/cli.jar',
-        java:    'java',
+        cli: '/usr/share/jenkins/cli/java/cli.jar',
+        java: 'java',
         timeout: 60,
       }.merge(options)
     end
@@ -77,9 +77,8 @@ module Jenkins
       command << %(-user "#{options[:cli_user]}")        if options[:cli_user]
       command << %(-i "#{options[:key]}")                if options[:key]
       command << %(-p #{uri_escape(options[:proxy])})    if options[:proxy]
+      command << %(-auth "#{options[:username]}":"#{options[:password]}") if options[:username] && options[:password]
       command.push(pieces)
-      command << %(--username "#{options[:username]}")   if options[:username]
-      command << %(--password "#{options[:password]}")   if options[:password]
 
       begin
         cmd = Mixlib::ShellOut.new(command.join(' '), command_options.merge(timeout: options[:timeout]))
@@ -101,7 +100,7 @@ module Jenkins
         if ((exitstatus == 255) && (stderr =~ /.*?Authentication failed\. No private key accepted\.$/)) ||
            ((exitstatus == 255) && (stderr =~ /^java\.io\.EOFException/)) ||
            ((exitstatus == 1) && (stderr =~ /^Exception in thread "main" java\.io\.EOFException/))
-          command.reject! { |c| c =~ /-i/ }
+          command.reject! { |c| c =~ /^-i / }
           retry
         elsif (exitstatus == 255) && (stderr =~ /^"--username" is not a valid option/)
           command.reject! { |c| c =~ /--username|--password/ }
@@ -134,12 +133,7 @@ module Jenkins
     #   the standard out from the command
     #
     def groovy!(script)
-      file = Tempfile.new('groovy')
-      file.write script
-      file.flush
-      execute!("groovy #{file.path}")
-    ensure
-      file.close! if file
+      execute!('groovy =', input: script)
     end
 
     #
@@ -148,12 +142,11 @@ module Jenkins
     # @see groovy!
     #
     def groovy(script)
-      file = Tempfile.new('groovy')
-      file.write script
-      file.flush
-      execute("groovy #{file.path}")
-    ensure
-      file.close! if file
+      execute('groovy =', input: script)
+    end
+
+    def groovy_from_file!(path)
+      execute!("groovy #{path}")
     end
 
     private

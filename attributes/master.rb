@@ -33,7 +33,7 @@ default['jenkins']['master'].tap do |master|
   #   node.normal['jenkins']['master']['install_method'] = 'war'
   #
   master['install_method'] = case node['platform_family']
-                             when 'debian', 'rhel' then 'package'
+                             when 'debian', 'rhel', 'amazon' then 'package'
                              else 'war'
                              end
 
@@ -192,6 +192,10 @@ default['jenkins']['master'].tap do |master|
   #
   master['log_directory'] = '/var/log/jenkins'
 
+  # Whether to enable web access logging or not.
+  # Set to "yes" to enable logging to /var/log/$NAME/access_log
+  master['access_log'] = 'no'
+
   #
   # Set the max open files to a specific value.
   # Due to http://github.com/jenkinsci/jenkins/commit/2fb288474e980d0e7ff9c4a3b768874835a3e92e
@@ -235,11 +239,11 @@ default['jenkins']['master'].tap do |master|
     case [node['platform_family'], node['jenkins']['master']['channel']]
     when %w(debian stable)
       ['https://pkg.jenkins.io/debian-stable', 'https://pkg.jenkins.io/debian-stable/jenkins.io.key']
-    when %w(rhel stable)
+    when %w(rhel stable), %w(amazon stable)
       ['https://pkg.jenkins.io/redhat-stable', 'https://pkg.jenkins.io/redhat-stable/jenkins.io.key']
     when %w(debian current)
       ['https://pkg.jenkins.io/debian', 'https://pkg.jenkins.io/debian/jenkins.io.key']
-    when %w(rhel current)
+    when %w(rhel current), %w(amazon current)
       ['https://pkg.jenkins.io/redhat', 'https://pkg.jenkins.io/redhat/jenkins.io.key']
     end
 

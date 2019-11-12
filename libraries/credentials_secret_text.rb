@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: credentials_secret_text
+# Resource:: credentials_secret_text
 #
 # Author:: Miguel Ferreira <mferreira@schubergphilis.com>
 #
@@ -39,7 +39,7 @@ end
 
 class Chef
   class Provider::JenkinsSecretTextCredentials < Provider::JenkinsCredentials
-    use_inline_resources
+    use_inline_resources # ~FC113
 
     provides :jenkins_secret_text_credentials
 
@@ -48,9 +48,7 @@ class Chef
 
       super
 
-      if current_credentials
-        @current_resource.secret(current_credentials[:secret])
-      end
+      @current_resource.secret(current_credentials[:secret]) if current_credentials
 
       @current_resource
     end

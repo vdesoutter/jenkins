@@ -41,13 +41,13 @@ Jenkins can fail to start if:
   - a plugin's dependencies are not installed
 
 If this problem persists, check your Jenkins log files.
-EOH
+        EOH
       end
     end
 
     # Matches Version 4 UUID per RFC 4122
     # Example: 38537014-ec66-49b5-aff2-aed1c19e2989
-    UUID_REGEX = /[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}/ unless defined?(UUID_REGEX)
+    UUID_REGEX = /[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}/.freeze unless defined?(UUID_REGEX)
 
     #
     # Helper method for creating an accessing a new {Jenkins::Executor} from
@@ -393,11 +393,12 @@ EOH
     def wait_until_ready!
       Timeout.timeout(timeout, JenkinsTimeout) do
         begin
-          open(endpoint)
+          open("#{endpoint}/whoAmI/")
         rescue SocketError,
                Errno::ECONNREFUSED,
                Errno::ECONNRESET,
                Errno::ENETUNREACH,
+               Errno::EADDRNOTAVAIL,
                Timeout::Error,
                OpenURI::HTTPError => e
           # If authentication has been enabled, the server will return an HTTP
@@ -434,7 +435,7 @@ EOH
 
     #
     # Idempotently download the remote +update-center.json+ file for the Jenkins
-    # server. This is needed to be able to install plugins throught the update-center.
+    # server. This is needed to be able to install plugins through the update-center.
     #
     def ensure_update_center_present!
       node.run_state[:jenkins_update_center_present] ||= begin # ~FC001
@@ -456,7 +457,7 @@ EOH
         # are containing some javascript, the line in between contains the relevant
         # JSON data. That is the one that must be extracted.
         IO.readlines(update_center_json).map do |line|
-          extracted_json = line unless line == 'updateCenter.post(' || line == ');'
+          extracted_json << line unless line.include?('updateCenter.post(') || line.include?(');')
         end
 
         # Write the extracted JSON to a file so `jenkins_plugin` can read it.
@@ -467,9 +468,7 @@ EOH
         # Setting sensitive(true) will suppress the long diff output, but this
         # functionality is not available in older versions of Chef, so we need
         # check if the resource responds to the method before calling it.
-        if extracted_json_file.respond_to?(:sensitive)
-          extracted_json_file.sensitive(true)
-        end
+        extracted_json_file.sensitive(true) if extracted_json_file.respond_to?(:sensitive)
 
         extracted_json_file.mode('0644')
         extracted_json_file.run_action(:create)

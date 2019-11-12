@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: credentials_user
+# Resource:: credentials_user
 #
 # Author:: Miguel Ferreira <mferreira@schubergphilis.com>
 #
@@ -33,7 +33,7 @@ end
 
 class Chef
   class Provider::JenkinsUserCredentials < Provider::JenkinsCredentials
-    use_inline_resources
+    use_inline_resources # ~FC113
     include Jenkins::Helper
 
     def load_current_resource
@@ -41,9 +41,7 @@ class Chef
 
       super
 
-      if current_credentials
-        @current_resource.username(current_credentials[:username])
-      end
+      @current_resource.username(current_credentials[:username]) if current_credentials
 
       @current_resource
     end
