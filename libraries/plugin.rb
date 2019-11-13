@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: plugin
+# Resource:: plugin
 #
 # Author:: Seth Vargo <sethvargo@gmail.com>
 # Author:: Seth Chisamore <schisamo@chef.io>
@@ -72,7 +72,7 @@ end
 class Chef
   class Provider::JenkinsPlugin < Provider::LWRPBase
     provides :jenkins_plugin
-    use_inline_resources
+    use_inline_resources # ~FC113
     include Jenkins::Helper
 
     provides :jenkins_plugin
@@ -151,11 +151,12 @@ EOH
           Chef::Log.info("#{new_resource} version #{current_resource.version} already installed - skipping")
         else
           current_version = plugin_version(current_resource.version)
-
-          if plugin_upgrade?(current_version, desired_version)
-            converge_by("Upgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &install_block)
-          else
-            converge_by("Downgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &downgrade_block)
+          unless current_version.to_s.include? 'SNAPSHOT'
+            if plugin_upgrade?(current_version, desired_version) # rubocop: disable Metrics/BlockNesting
+              converge_by("Upgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &install_block)
+            else
+              converge_by("Downgrade #{new_resource} from #{current_resource.version} to #{desired_version}", &downgrade_block)
+            end
           end
         end
       else
@@ -251,6 +252,9 @@ EOH
 
       if version.to_sym == :latest
         remote_plugin_data = plugin_universe[name]
+
+        return :latest unless remote_plugin_data
+
         plugin_version(remote_plugin_data['version'])
       else
         plugin_version(version)
@@ -318,6 +322,8 @@ EOH
       path   = ::File.join(Chef::Config[:file_cache_path], "#{plugin_name}-#{version}.plugin")
       plugin = Chef::Resource::RemoteFile.new(path, run_context)
       plugin.source(source_url)
+      plugin.owner(node['jenkins']['master']['user'])
+      plugin.group(node['jenkins']['master']['group'])
       plugin.backup(false)
       plugin.checksum(opts[:checksum]) if opts[:checksum]
       plugin.run_action(:create)
@@ -446,7 +452,8 @@ EOH
     # @return [String]
     #
     def plugin_version(version)
-      Gem::Version.new(version)
+      gem_version = Gem::Version.new(version)
+      gem_version.prerelease? ? version : gem_version
     rescue ArgumentError
       version
     end

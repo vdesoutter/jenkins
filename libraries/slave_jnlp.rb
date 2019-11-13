@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: jnlp_slave
+# Resource:: jnlp_slave
 #
 # Author:: Seth Chisamore <schisamo@chef.io>
 #
@@ -45,33 +45,59 @@ end
 
 class Chef
   class Provider::JenkinsJnlpSlave < Provider::JenkinsSlave
-    use_inline_resources
+    use_inline_resources # ~FC113
     provides :jenkins_jnlp_slave
 
     def load_current_resource
       @current_resource ||= Resource::JenkinsJnlpSlave.new(new_resource.name)
+
       super
     end
 
     action :create do
       do_create
 
-      parent_remote_fs_dir_resource.run_action(:create)
-
-      unless Chef::Platform.windows?
-        group_resource.run_action(:create)
-        user_resource.run_action(:create)
+      declare_resource(:directory, ::File.expand_path(new_resource.remote_fs, '..')) do
+        recursive(true)
+        action :create
       end
 
-      remote_fs_dir_resource.run_action(:create)
-      slave_jar_resource.run_action(:create)
+      unless Chef::Platform.windows?
+        declare_resource(:group, new_resource.group) do
+          system(node['jenkins']['master']['use_system_accounts'])
+        end
+
+        declare_resource(:user, new_resource.user) do
+          gid(new_resource.group)
+          comment('Jenkins slave user - Created by Chef')
+          home(new_resource.remote_fs)
+          system(node['jenkins']['master']['use_system_accounts'])
+          action :create
+        end
+      end
+
+      declare_resource(:directory, new_resource.remote_fs) do
+        owner(new_resource.user)
+        group(new_resource.group)
+        recursive(true)
+        action :create
+      end
+
+      declare_resource(:remote_file, slave_jar).tap do |r|
+        # We need to use .tap() to access methods in the provider's scope.
+        r.source slave_jar_url
+        r.backup(false)
+        r.mode('0755')
+        r.atomic_update(false)
+        r.notifies :restart, "runit_service[#{new_resource.service_name}]" unless Chef::Platform.windows?
+      end
 
       # The Windows's specific child class manages it's own service
       return if Chef::Platform.windows?
 
-      service_resource.run_action(:enable)
-      # We need to restart the service if the slave jar is updated
-      service_resource.run_action(:restart) if slave_jar_resource.updated?
+      include_recipe 'runit'
+
+      service_resource
     end
 
     action :delete do
@@ -127,6 +153,25 @@ class Chef
     #
     def slave_jar_url
       @slave_jar_url ||= uri_join(endpoint, 'jnlpJars', 'slave.jar')
+    end
+
+    def service_resource
+      declare_resource(:runit_service, new_resource.service_name).tap do |r|
+        # We need to use .tap() to access methods in the provider's scope.
+        r.cookbook('jenkins')
+        r.run_template_name('jenkins-slave')
+        r.log_template_name('jenkins-slave')
+        r.options(
+          service_name: new_resource.service_name,
+          jvm_options: new_resource.jvm_options,
+          user:        new_resource.user,
+          remote_fs:   new_resource.remote_fs,
+          java_bin:    java,
+          slave_jar:   slave_jar,
+          jnlp_url:    jnlp_url,
+          jnlp_secret: jnlp_secret
+        )
+      end
     end
 
     #

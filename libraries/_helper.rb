@@ -393,11 +393,12 @@ EOH
     def wait_until_ready!
       Timeout.timeout(timeout, JenkinsTimeout) do
         begin
-          open(endpoint)
+          open("#{endpoint}/whoAmI/")
         rescue SocketError,
                Errno::ECONNREFUSED,
                Errno::ECONNRESET,
                Errno::ENETUNREACH,
+               Errno::EADDRNOTAVAIL,
                Timeout::Error,
                OpenURI::HTTPError => e
           # If authentication has been enabled, the server will return an HTTP
@@ -434,7 +435,7 @@ EOH
 
     #
     # Idempotently download the remote +update-center.json+ file for the Jenkins
-    # server. This is needed to be able to install plugins throught the update-center.
+    # server. This is needed to be able to install plugins through the update-center.
     #
     def ensure_update_center_present!
       node.run_state[:jenkins_update_center_present] ||= begin # ~FC001
@@ -456,7 +457,7 @@ EOH
         # are containing some javascript, the line in between contains the relevant
         # JSON data. That is the one that must be extracted.
         IO.readlines(update_center_json).map do |line|
-          extracted_json = line unless line == 'updateCenter.post(' || line == ');'
+          extracted_json << line unless line.include?('updateCenter.post(') || line.include?(');')
         end
 
         # Write the extracted JSON to a file so `jenkins_plugin` can read it.

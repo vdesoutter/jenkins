@@ -101,7 +101,7 @@ module Jenkins
         if ((exitstatus == 255) && (stderr =~ /.*?Authentication failed\. No private key accepted\.$/)) ||
            ((exitstatus == 255) && (stderr =~ /^java\.io\.EOFException/)) ||
            ((exitstatus == 1) && (stderr =~ /^Exception in thread "main" java\.io\.EOFException/))
-          command.reject! { |c| c =~ /-i/ }
+          command.reject! { |c| c =~ /^-i / }
           retry
         elsif (exitstatus == 255) && (stderr =~ /^"--username" is not a valid option/)
           command.reject! { |c| c =~ /--username|--password/ }
@@ -134,12 +134,7 @@ module Jenkins
     #   the standard out from the command
     #
     def groovy!(script)
-      file = Tempfile.new('groovy')
-      file.write script
-      file.flush
-      execute!("groovy #{file.path}")
-    ensure
-      file.close! if file
+      execute!('groovy =', input: script)
     end
 
     #
@@ -148,12 +143,11 @@ module Jenkins
     # @see groovy!
     #
     def groovy(script)
-      file = Tempfile.new('groovy')
-      file.write script
-      file.flush
-      execute("groovy #{file.path}")
-    ensure
-      file.close! if file
+      execute('groovy =', input: script)
+    end
+
+    def groovy_from_file!(path)
+      execute!("groovy #{path}")
     end
 
     private

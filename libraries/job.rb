@@ -1,6 +1,6 @@
 #
 # Cookbook:: jenkins
-# HWRP:: job
+# Resource:: job
 #
 # Author:: Seth Vargo <sethvargo@gmail.com>
 #
@@ -78,7 +78,7 @@ end
 
 class Chef
   class Provider::JenkinsJob < Provider::LWRPBase
-    use_inline_resources
+    use_inline_resources # ~FC113
 
     include Jenkins::Helper
 
@@ -321,9 +321,9 @@ EOH
       Chef::Log.debug "Validate #{new_resource} configuration"
 
       if new_resource.config.nil?
-        raise("#{new_resource} must specify a configuration file!")
+        raise("#{new_resource} must specify a configuration file!") if new_resource.config.nil?
       elsif !::File.exist?(new_resource.config)
-        raise("#{new_resource} config `#{new_resource.config}` does not exist!")
+        raise("#{new_resource} config `#{new_resource.config}` does not exist!") unless ::File.exist?(new_resource.config)
       else
         begin
           REXML::Document.new(::File.read(new_resource.config))

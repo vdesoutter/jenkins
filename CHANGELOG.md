@@ -2,6 +2,56 @@
 
 This file is used to list changes made in each version of the jenkins cookbook.
 
+## 6.2.1 (2018-11-14)
+
+- @josh-barker entirely rewrote our test suites. Suites have been consolidated, everything now passes, and all validation is performed with all new InSpec tests. Thanks Josh for this massive improvement.
+- Fix bug when remote plugin is not found in plugin universe 
+- Fix broken delete action for jnlp slave
+- Fix cloning resources attributes for/var/lib/jenkins
+- Set httpKeepAliveTimeout to 5 minutes so that connections are not closed too early
+- Increase slave launch timeout to 2 minutes for slow systems
+- Add documentation about slave failure due to slow performance
+- Mark windows template sensitive if setting password, remove default '.' for windows users domain
+
+## 6.2.0 (2018-07-30)
+
+- Code improvement for custom plugin update centre
+- Don't fail on deprecations for now
+- Remove respond_to? on chef_version in metadata
+- Fix jenkins_view and jenkins_user resource errors
+
+## 6.1.0 (2018-07-24)
+
+- Added new jenkins_view resource
+- Added new jenkins_proxy resource
+- Allow jenkins_script to execute a groovy script on disk
+
+## 6.0.0 (2018-02-16)
+
+- Require Chef 12.14+ and remove compat_resource dependency
+
+## 5.0.6 (2018-01-15)
+
+- windows slave fixes
+
+## 5.0.5 (2017-11-22)
+
+- If the installed plugin version is a SNAPSHOT let it be instead of checking versions for updates
+- Allow Jenkins to read system environment variables
+- Fix permissions on /var/xxx/jenkins folders for Debian/CentOS
+- Plugins: User & Group should be read from attributes
+- Resolve Chef 13 failures by not passing new_resource into runit_service
+
+## 5.0.4 (2017-08-28)
+
+- Modified case statements to support package installation on Amazon Linux
+- Changes endpoint for 'wait_until_ready' helper
+- Fix permissions for plugin files downloaded from update center
+- Wait for Jenkins in case of EADDRNOTAVAIL
+- Change groovy scripts to use stdin instead of file. Fixes #620
+- And change test to expect new format
+- Ensure that we only reject the '-i key' part and not, for instance, parts that contain '-i' in larger strings.
+
 ## 5.0.3 (2017-07-04)
 
 - Removed mention of Amazon Linux support from the readme. We will support this in the future, but at the moment the cookbook does not actually support Amazon Linux
