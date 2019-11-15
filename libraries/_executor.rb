@@ -69,8 +69,9 @@ module Jenkins
     def execute!(*pieces)
       command_options = pieces.last.is_a?(Hash) ? pieces.pop : {}
       command = []
+      command << %(#{options[:prefix]})                  if options[:prefix]
       command << %("#{options[:java]}")
-      command << options[:jvm_options].to_s if options[:jvm_options]
+      command << options[:jvm_options].to_s              if options[:jvm_options]
       command << %(-jar "#{options[:cli]}")
       command << %(-s #{URI.escape(options[:endpoint])}) if options[:endpoint]
       command << %(-#{options[:protocol]})               if options[:protocol]
@@ -122,7 +123,7 @@ module Jenkins
            Mixlib::ShellOut::CommandTimeout
       nil
     end
-
+    
     #
     # Execute the given inline groovy script, raising exceptions if something
     # fails.
@@ -137,7 +138,10 @@ module Jenkins
       file = Tempfile.new('groovy')
       file.write script
       file.flush
-      execute!("groovy #{file.path}")
+      @options[:prefix] = "cat #{file.path} |"
+      result = execute!("groovy =")
+      @options.delete(:prefix)
+      return result
     ensure
       file.close! if file
     end
@@ -151,7 +155,10 @@ module Jenkins
       file = Tempfile.new('groovy')
       file.write script
       file.flush
-      execute("groovy #{file.path}")
+      @options[:prefix] = "cat #{file.path} |"
+      result = execute("groovy =")
+      @options.delete(:prefix)
+      return result
     ensure
       file.close! if file
     end

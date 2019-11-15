@@ -24,6 +24,8 @@ provisioner:
         host: localhost
         install_method: war
         mirror: https://updates.jenkins.io
+  client_rb:
+    chef_license: accept
 
 platforms:
   - name: centos-6.9
