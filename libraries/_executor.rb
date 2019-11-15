@@ -139,8 +139,9 @@ module Jenkins
       file.write script
       file.flush
       @options[:prefix] = "cat #{file.path} |"
-      execute!("groovy =")
+      result = execute!("groovy =")
       @options.delete(:prefix)
+      return result
     ensure
       file.close! if file
     end
@@ -155,8 +156,9 @@ module Jenkins
       file.write script
       file.flush
       @options[:prefix] = "cat #{file.path} |"
-      execute("groovy =")
+      result = execute("groovy =")
       @options.delete(:prefix)
+      return result
     ensure
       file.close! if file
     end
