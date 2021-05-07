@@ -15,8 +15,10 @@ exec chpst -u <%= groups %> -U <%= groups %> \
 <%- if @options[:jvm_options] -%>
   <%= @options[:jvm_options] %> \
 <%- end -%>
-  -jar <%= @options[:slave_jar] %> \
-<%- if @options[:jnlp_secret] -%>
-  -secret <%= @options[:jnlp_secret] %> \
-<%- end -%>
-  -jnlpUrl <%= @options[:jnlp_url] %>
+  -cp <%= @options[:slave_jar] %> \
+  hudson.remoting.jnlp.Main \
+  -headless \
+  -workDir <%= @options[:remote_fs] %>/work \
+  -direct <%= @options[:direct_host] %>:<%= @options[:direct_port] %> \
+  -protocols JNLP4-connect \
+  -instanceIdentity "<%= @options[:instance_identity] %>" <%= @options[:jnlp_secret] %> <%= @options[:slave_name] %>

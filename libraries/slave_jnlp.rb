@@ -183,8 +183,12 @@ class Chef
           java_bin: java,
           slave_jar: slave_jar,
           jnlp_url: jnlp_url,
-          jnlp_secret: jnlp_secret
-        )
+          jnlp_secret: jnlp_secret,
+          direct_host: jnlp_direct_host,
+          direct_port: jnlp_direct_port,
+          instance_identity: instance_identity,
+          slave_name: new_resource.slave_name
+          )
       end
     end
 
