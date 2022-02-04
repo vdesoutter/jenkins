@@ -31,6 +31,7 @@ class Chef
     identity_attr :slave_name
 
     # Actions
+    actions :create, :online, :offline
     default_action :create
 
     # Attributes
